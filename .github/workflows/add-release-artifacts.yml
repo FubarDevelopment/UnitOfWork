@@ -1,0 +1,51 @@
+# This is a basic workflow to help you get started with Actions
+
+name: Add Release Artifacts
+
+# Controls when the workflow will run
+on:
+  # Triggers the workflow when a release is creted
+  release: [created]
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+    inputs:
+      tagName:
+        description: The name of the tag of the release to upload the artifacts for
+        required: true
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  # This workflow contains a single job called "build"
+  build:
+    # The type of runner that the job will run on
+    runs-on: ubuntu-latest
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+      - name: Reset packages directory
+        run: |
+          rm -fR packages
+          mkdir packages
+      - name: Set env from release event
+        if: ${{ github.event_name == 'release' }}
+        run: echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
+        env:
+          TAG_NAME: ${{ github.event.release.tag_name }}
+      - name: Set env from manual trigger
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        run: echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
+        env:
+          TAG_NAME: ${{ github.event.inputs.tagName }}
+      - name: Download a Build Artifact
+        uses: actions/download-artifact@v2.0.10
+        with:
+          # Artifact name
+          name: fubardev-unit-of-work-${{ env.TAG_NAME }}
+          path: packages/
+#      - name: GitHub Releases
+#        uses: fnkr/github-action-ghr@v1.3
+#        env:
+#          GITHUB_REF: refs/tags/${{ env.TAG_NAME }}
+#          GHR_PATH: build/
+#          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
