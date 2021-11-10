@@ -7,6 +7,7 @@
         <LangVersion>9.0</LangVersion>
         <Nullable>enable</Nullable>
         <CodeAnalysisRuleSet>$(MSBuildThisFileDirectory)FubarDev.UnitOfWork.ruleset</CodeAnalysisRuleSet>
+        <Description>Base classes and interfaces for a scoped/nested implementation for a Unit Of Work.</Description>
     </PropertyGroup>
     
     <PropertyGroup>

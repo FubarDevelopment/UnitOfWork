@@ -7,6 +7,7 @@
         <LangVersion>9.0</LangVersion>
         <Nullable>enable</Nullable>
         <CodeAnalysisRuleSet>$(MSBuildThisFileDirectory)FubarDev.UnitOfWork.NhSession.ruleset</CodeAnalysisRuleSet>
+        <Description>Repository manager for NHibernate to be used in a Unit Of Work.</Description>
     </PropertyGroup>
     
     <PropertyGroup>

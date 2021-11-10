@@ -16,6 +16,11 @@
     <PackageReleaseNotes>https://github.com/FubarDevelopment/UnitOfWork/releases</PackageReleaseNotes>
     <RepositoryUrl>https://github.com/FubarDevelopment/UnitOfWork.git</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
+  
+  <ItemGroup>
+    <None Include="$(MSBuildThisFileDirectory)README.md" Pack="true" PackagePath="\"/>
+  </ItemGroup>
 
 </Project>

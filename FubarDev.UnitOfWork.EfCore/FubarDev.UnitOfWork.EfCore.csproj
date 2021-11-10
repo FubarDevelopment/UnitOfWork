@@ -5,6 +5,7 @@
         <LangVersion>9.0</LangVersion>
         <Nullable>enable</Nullable>
         <CodeAnalysisRuleSet>$(MSBuildThisFileDirectory)FubarDev.UnitOfWork.EfCore.ruleset</CodeAnalysisRuleSet>
+        <Description>Repository manager for Entity Framework Core to be used in a Unit Of Work.</Description>
     </PropertyGroup>
 
     <PropertyGroup>
