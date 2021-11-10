@@ -37,10 +37,11 @@ jobs:
         run: echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
         env:
           TAG_NAME: ${{ github.event.inputs.tagName }}
-      - name: Download a Build Artifact
-        uses: actions/download-artifact@v2.0.10
+      - name: Download artifact
+        # You may pin to the exact commit or the version.
+        # uses: aochmann/actions-download-artifact@5709392f11b5937bd316e52687ad87f7deced5f5
+        uses: aochmann/actions-download-artifact@1.0.4
         with:
-          # Artifact name
           name: fubardev-unit-of-work-${{ env.TAG_NAME }}
           path: packages/
 #      - name: GitHub Releases
