@@ -6,7 +6,7 @@ name: Add Release Artifacts
 on:
   # Triggers the workflow when a release is created
   release:
-    types: [created]
+    types: [created,published]
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
     inputs:
@@ -44,9 +44,9 @@ jobs:
         with:
           name: fubardev-unit-of-work-${{ env.TAG_NAME }}
           path: packages/
-#      - name: GitHub Releases
-#        uses: fnkr/github-action-ghr@v1.3
-#        env:
-#          GITHUB_REF: refs/tags/${{ env.TAG_NAME }}
-#          GHR_PATH: build/
-#          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: GitHub Releases
+        uses: fnkr/github-action-ghr@v1.3
+        env:
+          GITHUB_REF: refs/tags/${{ env.TAG_NAME }}
+          GHR_PATH: build/
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
