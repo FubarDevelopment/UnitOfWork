@@ -64,8 +64,8 @@ jobs:
           # secrets.GITHUB_TOKEN
           repo-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Publish the package to GPR
-        run: dotnet nuget push packages/*.nupkg
+        run: dotnet nuget push --skip-duplicate packages/*.nupkg
       - name: Publish the package to nuget.org
-        run: dotnet nuget push packages/*.nupkg -k $NUGET_AUTH_TOKEN -s https://api.nuget.org/v3/index.json
+        run: dotnet nuget push --skip-duplicate packages/*.nupkg -k $NUGET_AUTH_TOKEN -s https://api.nuget.org/v3/index.json
         env:
           NUGET_AUTH_TOKEN: ${{ secrets.NUGET_UOW }}
