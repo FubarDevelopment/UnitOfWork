@@ -44,9 +44,14 @@ jobs:
         with:
           name: fubardev-unit-of-work-${{ env.TAG_NAME }}
           path: packages/
-      - name: GitHub Releases
-        uses: fnkr/github-action-ghr@v1.3
-        env:
-          GITHUB_REF: refs/tags/${{ env.TAG_NAME }}
-          GHR_PATH: build/
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Upload assets to a Release
+        # You may pin to the exact commit or the version.
+        # uses: AButler/upload-release-assets@ec6d3263266dc57eb6645b5f75e827987f7c217d
+        uses: AButler/upload-release-assets@v2.0
+        with:
+          # A glob of the files to upload
+          files: 'packages/*'
+          # The tag name of the release to upload to (if not specified then the release that triggered the workflow is used)
+          release-tag: ${{ env.TAG_NAME }}
+          # secrets.GITHUB_TOKEN
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
