@@ -25,6 +25,12 @@ jobs:
 
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
+      - name: Setup .NET Core SDK
+        uses: actions/setup-dotnet@v1.8.2
+        with:
+          source-url: https://nuget.pkg.github.com/FubarDevelopment/index.json
+        env:
+          NUGET_AUTH_TOKEN: ${{secrets.GITHUB_TOKEN}}
       - name: Reset packages directory
         run: |
           rm -fR packages
@@ -57,3 +63,9 @@ jobs:
           release-tag: ${{ env.TAG_NAME }}
           # secrets.GITHUB_TOKEN
           repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish the package to GPR
+        run: dotnet nuget push packages/*.nupkg
+      - name: Publish the package to nuget.org
+        run: dotnet nuget push packages/*.nupkg -k $NUGET_AUTH_TOKEN -s https://api.nuget.org/v3/index.json
+        env:
+          NUGET_AUTH_TOKEN: ${{ secrets.NUGET_UOW }}
