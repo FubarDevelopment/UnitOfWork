@@ -4,11 +4,10 @@ name: Add Release Artifacts
 
 # Controls when the workflow will run
 on:
-  # Triggers the workflow when a release is created/updated, etc...
+  # Triggers the workflow when a release is created
   release:
     types:
       - created
-      - published
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
