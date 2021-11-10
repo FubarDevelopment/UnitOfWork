@@ -6,6 +6,9 @@ name: Add Release Artifacts
 on:
   # Triggers the workflow when a release is created/updated, etc...
   release:
+    types:
+      - created
+      - published
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
@@ -13,7 +16,7 @@ on:
       tagName:
         description: The name of the tag of the release to upload the artifacts for
         required: true
-
+        
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
   # This workflow contains a single job called "build"
