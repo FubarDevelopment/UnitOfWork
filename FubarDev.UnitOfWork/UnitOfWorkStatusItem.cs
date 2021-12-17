@@ -11,16 +11,23 @@ namespace FubarDev.UnitOfWork
         public UnitOfWorkStatusItem(
             TRepository repository,
             bool isNewRepository,
+            bool saveChangesOnDispose,
             IRepositoryTransaction? inheritedTransaction = null)
         {
             Repository = repository;
             IsNewRepository = isNewRepository;
+            SaveChangesOnDispose = saveChangesOnDispose;
             InheritedTransaction = inheritedTransaction;
         }
 
         public TRepository Repository { get; }
 
         public bool IsNewRepository { get; }
+
+        /// <summary>
+        /// Gets a value indicating whether the changes should be saved when the unit of work gets disposed.
+        /// </summary>
+        public bool SaveChangesOnDispose { get; }
 
         public IRepositoryTransaction? InheritedTransaction { get; set; }
 

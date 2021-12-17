@@ -13,5 +13,11 @@ namespace FubarDev.UnitOfWork
         /// Gets or sets a value indicating whether nested transactions are allowed.
         /// </summary>
         public bool AllowNestedTransactions { get; set; }
+
+        /// <summary>
+        /// Gets or sets a value indicating whether the changes should be automatically saved when a
+        /// unit of work gets disposed.
+        /// </summary>
+        public bool SaveChangesWhenDisposingUnitOfWork { get; set; }
     }
 }

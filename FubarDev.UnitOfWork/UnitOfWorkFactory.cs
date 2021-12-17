@@ -4,7 +4,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -28,6 +27,7 @@ namespace FubarDev.UnitOfWork
         private readonly IRepositoryManager<TRepository> _repositoryManager;
         private readonly ILogger<UnitOfWorkFactory<TRepository>>? _logger;
         private readonly bool _allowNestedTransactions;
+        private readonly bool _saveChangesOnDispose;
 
         private readonly Dictionary<UnitOfWorkStatusItem<TRepository>, IUnitOfWork<TRepository>>
             _unitOfWorkByStatusItems = new();
@@ -44,6 +44,7 @@ namespace FubarDev.UnitOfWork
             IOptions<UnitOfWorkFactoryOptions>? options = null)
         {
             _allowNestedTransactions = options?.Value.AllowNestedTransactions ?? false;
+            _saveChangesOnDispose = options?.Value.SaveChangesWhenDisposingUnitOfWork ?? true;
             _repositoryManager = repositoryManager;
             _logger = logger;
             _statusManager = new DefaultStatusManager<UnitOfWorkStatusItem<TRepository>>(
@@ -58,6 +59,14 @@ namespace FubarDev.UnitOfWork
         public ValueTask<IUnitOfWork<TRepository>> CreateAsync(
             CancellationToken cancellationToken = default)
         {
+            return CreateAsync(_saveChangesOnDispose, cancellationToken);
+        }
+
+        /// <inheritdoc />
+        public ValueTask<IUnitOfWork<TRepository>> CreateAsync(
+            bool saveChangesOnDispose,
+            CancellationToken cancellationToken = default)
+        {
             var repository = _statusManager.TryGetCurrent(out var currentStatusItem)
                 ? currentStatusItem.Repository
                 : _repositoryManager.Create();
@@ -65,6 +74,7 @@ namespace FubarDev.UnitOfWork
             var newStatusItem = new UnitOfWorkStatusItem<TRepository>(
                 repository,
                 currentStatusItem == null,
+                saveChangesOnDispose,
                 currentStatusItem?.InheritedTransaction);
             _statusManager.Add(newStatusItem);
 
@@ -106,6 +116,7 @@ namespace FubarDev.UnitOfWork
 
             var newStatusItem = new UnitOfWorkStatusItem<TRepository>(
                 repository,
+                false,
                 currentStatusItem == null);
             _statusManager.Add(newStatusItem);
 
@@ -166,10 +177,6 @@ namespace FubarDev.UnitOfWork
             return new ValueTask<ITransactionalUnitOfWork<TRepository>>(resultTask);
         }
 
-        [SuppressMessage(
-            "ReSharper",
-            "SuspiciousTypeConversion.Global",
-            Justification = "Might be used by a user of this library")]
         internal async ValueTask FinishAsync(
             UnitOfWorkStatusItem<TRepository> statusItem,
             StatusItemResult status,
@@ -184,6 +191,13 @@ namespace FubarDev.UnitOfWork
                     "Finalizing unit of work {Id} with effective status {Status}",
                     unitOfWork.Id,
                     finalStatus);
+
+                if (statusItem.SaveChangesOnDispose
+                    && finalStatus is StatusItemResult.Undefined or StatusItemResult.Commit)
+                {
+                    // Flush all changes
+                    await _repositoryManager.SaveChangesAsync(item.Repository, cancellationToken);
+                }
 
                 var transaction = item.NewTransaction;
                 if (transaction != null)
@@ -212,11 +226,6 @@ namespace FubarDev.UnitOfWork
                     {
                         disposable.Dispose();
                     }
-                }
-                else if (finalStatus is StatusItemResult.Undefined or StatusItemResult.Commit)
-                {
-                    // Flush all changes
-                    await _repositoryManager.SaveChangesAsync(item.Repository, cancellationToken);
                 }
 
                 if (item.IsNewRepository)

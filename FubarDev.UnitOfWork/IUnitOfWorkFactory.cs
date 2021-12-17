@@ -21,6 +21,15 @@ namespace FubarDev.UnitOfWork
         ValueTask<IUnitOfWork<TRepository>> CreateAsync(CancellationToken cancellationToken = default);
 
         /// <summary>
+        /// Creates a new unit of work.
+        /// </summary>
+        /// <param name="saveChangesOnDispose">Indicates whether the changes should be saved when the unit of work
+        /// gets disposed.</param>
+        /// <param name="cancellationToken">The <see cref="CancellationToken"/>.</param>
+        /// <returns>The new unit of work.</returns>
+        ValueTask<IUnitOfWork<TRepository>> CreateAsync(bool saveChangesOnDispose, CancellationToken cancellationToken = default);
+
+        /// <summary>
         /// Creates a new transactional unit of work.
         /// </summary>
         /// <param name="cancellationToken">The <see cref="CancellationToken"/>.</param>
