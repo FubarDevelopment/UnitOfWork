@@ -71,9 +71,10 @@ namespace FubarDev.UnitOfWork
                 ? currentStatusItem.Repository
                 : _repositoryManager.Create();
 
+            var isNewRepository = currentStatusItem == null;
             var newStatusItem = new UnitOfWorkStatusItem<TRepository>(
                 repository,
-                currentStatusItem == null,
+                isNewRepository,
                 saveChangesOnDispose,
                 currentStatusItem?.InheritedTransaction);
             _statusManager.Add(newStatusItem);
