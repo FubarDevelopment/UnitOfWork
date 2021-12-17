@@ -44,7 +44,7 @@ namespace FubarDev.UnitOfWork
             IOptions<UnitOfWorkFactoryOptions>? options = null)
         {
             _allowNestedTransactions = options?.Value.AllowNestedTransactions ?? false;
-            _saveChangesOnDispose = options?.Value.SaveChangesWhenDisposingUnitOfWork ?? true;
+            _saveChangesOnDispose = options?.Value.SaveChangesWhenDisposingUnitOfWork ?? false;
             _repositoryManager = repositoryManager;
             _logger = logger;
             _statusManager = new DefaultStatusManager<UnitOfWorkStatusItem<TRepository>>(

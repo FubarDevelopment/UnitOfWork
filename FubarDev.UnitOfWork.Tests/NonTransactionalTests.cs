@@ -3,6 +3,7 @@
 // </copyright>
 
 using System;
+using System.Linq;
 using System.Threading.Tasks;
 
 using FubarDev.UnitOfWork.Tests.Support;
@@ -58,7 +59,7 @@ namespace FubarDev.UnitOfWork.Tests
             }
 
             Assert.Contains(repositoryId, _repositoryManager.Creations);
-            Assert.Equal(1, _repositoryManager.SavedChangesCount);
+            Assert.Equal(0, _repositoryManager.SavedChangesCount);
             Assert.Equal(1, _repositoryManager.DisposedRepositories);
         }
 
@@ -77,7 +78,7 @@ namespace FubarDev.UnitOfWork.Tests
 
             Assert.Equal(repositoryId1, repositoryId2);
             Assert.Equal(repositoryId1, Assert.Single(_repositoryManager.Creations));
-            Assert.Equal(2, _repositoryManager.SavedChangesCount);
+            Assert.Equal(0, _repositoryManager.SavedChangesCount);
             Assert.Equal(1, _repositoryManager.DisposedRepositories);
         }
     }

@@ -167,7 +167,7 @@ namespace FubarDev.UnitOfWork.Tests
 
             Assert.Equal(repositoryId1, repositoryId2);
             Assert.Equal(repositoryId1, Assert.Single(_repositoryManager.Creations));
-            Assert.Equal(1, _repositoryManager.SavedChangesCount);
+            Assert.Equal(0, _repositoryManager.SavedChangesCount);
             Assert.Contains(repositoryId1, _repositoryManager.Commits);
             Assert.Contains(repositoryId1, _repositoryManager.Rollbacks);
             Assert.Equal(0, _repositoryManager.CommitCount);
@@ -196,7 +196,7 @@ namespace FubarDev.UnitOfWork.Tests
 
             Assert.Equal(repositoryId1, repositoryId2);
             Assert.Equal(repositoryId1, Assert.Single(_repositoryManager.Creations));
-            Assert.Equal(1, _repositoryManager.SavedChangesCount);
+            Assert.Equal(0, _repositoryManager.SavedChangesCount);
             Assert.Contains(repositoryId1, _repositoryManager.Commits);
             Assert.Contains(repositoryId1, _repositoryManager.Rollbacks);
             Assert.Equal(0, _repositoryManager.CommitCount);
