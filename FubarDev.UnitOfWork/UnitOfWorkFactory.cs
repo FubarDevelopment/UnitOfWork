@@ -114,10 +114,11 @@ namespace FubarDev.UnitOfWork
                 _allowNestedTransactions
                 || currentStatusItem?.InheritedTransaction == null;
 
+            var isNewRepository = currentStatusItem == null;
             var newStatusItem = new UnitOfWorkStatusItem<TRepository>(
                 repository,
-                false,
-                currentStatusItem == null);
+                isNewRepository,
+                !isNewRepository);
             _statusManager.Add(newStatusItem);
 
             // Register the unit of work
