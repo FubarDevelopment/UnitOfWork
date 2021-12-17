@@ -85,7 +85,7 @@ namespace FubarDev.UnitOfWork
                 this);
             _unitOfWorkByStatusItems[newStatusItem] = unitOfWork;
 
-            _logger?.LogWarning("Created unit of work {Id}", unitOfWork.Id);
+            _logger?.LogInformation("Created unit of work {Id}", unitOfWork.Id);
 
             if (!newStatusItem.IsNewRepository)
             {
@@ -128,7 +128,7 @@ namespace FubarDev.UnitOfWork
                 this);
             _unitOfWorkByStatusItems[newStatusItem] = unitOfWork;
 
-            _logger?.LogWarning("Created unit of work {Id}", unitOfWork.Id);
+            _logger?.LogInformation("Created unit of work {Id}", unitOfWork.Id);
 
             var resultTask = Task.FromResult<ITransactionalUnitOfWork<TRepository>>(unitOfWork);
             if (newStatusItem.IsNewRepository)
@@ -187,7 +187,8 @@ namespace FubarDev.UnitOfWork
             {
                 var unitOfWork = _unitOfWorkByStatusItems[item];
                 var finalStatus = finalizingInfo.GetEffectiveResult(item);
-                _logger?.LogWarning(
+                _logger?.Log(
+                    finalStatus.GetLogLevel(),
                     "Finalizing unit of work {Id} with effective status {Status}",
                     unitOfWork.Id,
                     finalStatus);

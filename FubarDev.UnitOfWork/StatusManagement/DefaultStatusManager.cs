@@ -101,7 +101,7 @@ namespace FubarDev.UnitOfWork.StatusManagement
 
                 var container = new StatusItemContainer<TStatusItem>(statusItem);
                 statusHolder.Add(container);
-                _logger?.LogInformation("Added status item {Id}", container.Id);
+                _logger?.LogDebug("Added status item {Id}", container.Id);
             }
         }
 
@@ -129,7 +129,8 @@ namespace FubarDev.UnitOfWork.StatusManagement
 
                 // Set the items status
                 container.Result = result;
-                _logger?.LogInformation(
+                _logger?.Log(
+                    container.Result.GetLogLevel(),
                     "Container {Id} set to status {Status}",
                     container.Id,
                     container.Result);
@@ -146,18 +147,23 @@ namespace FubarDev.UnitOfWork.StatusManagement
                 }
 
                 // Merge the new status
-                container.EffectiveResult = StatusResultEvaluator.GetEffectiveResult(
+                var effectiveResult = StatusResultEvaluator.GetEffectiveResult(
                     statusHolder.Status,
                     container.Result);
-                _logger?.LogWarning(
+                container.EffectiveResult = effectiveResult;
+                _logger?.Log(
+                    effectiveResult.GetLogLevel(),
                     "Container {Id} completed with effective status {EffectiveStatus}",
                     container.Id,
-                    container.EffectiveResult);
+                    effectiveResult);
                 statusHolder.Status = StatusResultEvaluator.ApplyResult(
                     statusHolder.Status,
                     statusItem,
                     container.Result);
-                _logger?.LogWarning("Chain status changed to {Status}", statusHolder.Status);
+                _logger?.Log(
+                    statusHolder.Status.GetLogLevel(),
+                    "Chain status changed to {Status}",
+                    statusHolder.Status);
 
                 // Remember the status item
                 completedStatusItems.Add(container);
@@ -167,13 +173,13 @@ namespace FubarDev.UnitOfWork.StatusManagement
                 // finished.
                 while (statusHolder.TryRemoveFinished(out var next))
                 {
-                    _logger?.LogWarning("Container {Id} completed", next.Id);
+                    _logger?.LogInformation("Container {Id} completed", next.Id);
 
                     // Merge the new status
                     next.EffectiveResult = StatusResultEvaluator.GetEffectiveResult(
                         statusHolder.Status,
                         next.Result);
-                    _logger?.LogWarning(
+                    _logger?.LogInformation(
                         "Container {Id} completed with effective status {EffectiveStatus}",
                         next.Id,
                         next.EffectiveResult);
@@ -181,7 +187,7 @@ namespace FubarDev.UnitOfWork.StatusManagement
                         statusHolder.Status,
                         next.StatusItem,
                         next.Result);
-                    _logger?.LogWarning("Chain status changed to {Status}", statusHolder.Status);
+                    _logger?.LogInformation("Chain status changed to {Status}", statusHolder.Status);
 
                     // Remember the status item
                     completedStatusItems.Add(next);
