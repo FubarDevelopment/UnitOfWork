@@ -4,6 +4,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -43,16 +44,21 @@ namespace FubarDev.UnitOfWork.Tests.Support
 
         public CountingRepository Create()
         {
-            var result = new CountingRepository(this, Guid.NewGuid());
-            Assert.True(Creations.Add(result));
-            _savedChanges.Add(result, 0);
-            return result;
+            lock (this)
+            {
+                var result = new CountingRepository(this, Guid.NewGuid());
+                Assert.True(Creations.Add(result));
+                _savedChanges.Add(result, 0);
+                Debug.WriteLine($"Created repository with ID {result.Id}");
+                return result;
+            }
         }
 
         public ValueTask InitializeAsync(
             CountingRepository repository,
             CancellationToken cancellationToken = default)
         {
+            Debug.WriteLine($"Initialized repository with ID {repository.Id}");
             return default;
         }
 
@@ -60,16 +66,23 @@ namespace FubarDev.UnitOfWork.Tests.Support
             CountingRepository repository,
             CancellationToken cancellationToken)
         {
-            _rollbacks.Add(repository, 0);
-            _commits.Add(repository, 0);
-            var result = new RepositoryTransaction(this, repository);
-            return ValueTask.FromResult<IRepositoryTransaction>(result);
+            lock (this)
+            {
+                Debug.WriteLine($"Try add repository with ID {repository.Id}");
+                _rollbacks.Add(repository, 0);
+                _commits.Add(repository, 0);
+                var result = new RepositoryTransaction(this, repository);
+                return ValueTask.FromResult<IRepositoryTransaction>(result);
+            }
         }
 
         public ValueTask SaveChangesAsync(CountingRepository repository, CancellationToken cancellationToken = default)
         {
-            _savedChanges[repository] += 1;
-            return ValueTask.CompletedTask;
+            lock (this)
+            {
+                _savedChanges[repository] += 1;
+                return ValueTask.CompletedTask;
+            }
         }
 
         private class RepositoryTransaction : IRepositoryTransaction, IAsyncDisposable
@@ -87,20 +100,29 @@ namespace FubarDev.UnitOfWork.Tests.Support
 
             public ValueTask CommitAsync(CancellationToken cancellationToken = default)
             {
-                _repositoryManager._commits[_repositoryId] += 1;
-                return ValueTask.CompletedTask;
+                lock (_repositoryManager)
+                {
+                    _repositoryManager._commits[_repositoryId] += 1;
+                    return ValueTask.CompletedTask;
+                }
             }
 
             public ValueTask RollbackAsync(CancellationToken cancellationToken = default)
             {
-                _repositoryManager._rollbacks[_repositoryId] += 1;
-                return ValueTask.CompletedTask;
+                lock (_repositoryManager)
+                {
+                    _repositoryManager._rollbacks[_repositoryId] += 1;
+                    return ValueTask.CompletedTask;
+                }
             }
 
             public ValueTask DisposeAsync()
             {
-                _repositoryManager.DisposedTransactions += 1;
-                return default;
+                lock (_repositoryManager)
+                {
+                    _repositoryManager.DisposedTransactions += 1;
+                    return default;
+                }
             }
         }
     }

@@ -307,5 +307,29 @@ namespace FubarDev.UnitOfWork.Tests
             Assert.Equal(1, _repositoryManager.DisposedRepositories);
             Assert.Equal(1, _repositoryManager.DisposedTransactions);
         }
+
+        [Fact]
+        public async Task TestConcurrencyAsync()
+        {
+            var taskCount = Environment.ProcessorCount * 10;
+
+            var tasks = Enumerable.Range(0, taskCount)
+                .Select(_ => _factory.CreateTransactionalAsync().AsTask())
+                .ToList();
+
+            var unitsOfWork = await Task.WhenAll(tasks);
+
+            Assert.Equal(taskCount, _factoryStatus.ActiveUnitsOfWork.Count());
+
+            var disposeTasks = unitsOfWork.Select(static x => x.DisposeAsync().AsTask()).ToList();
+            await Task.WhenAll(disposeTasks);
+
+            Assert.Empty(_factoryStatus.ActiveUnitsOfWork);
+
+            Assert.Equal(0, _repositoryManager.SavedChangesCount);
+            Assert.Equal(1, _repositoryManager.DisposedTransactions);
+            Assert.Equal(1, _repositoryManager.RollbackCount);
+            Assert.Equal(1, _repositoryManager.DisposedRepositories);
+        }
     }
 }

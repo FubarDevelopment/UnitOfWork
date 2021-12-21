@@ -13,6 +13,8 @@ using FubarDev.UnitOfWork.StatusManagement;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
+using Nito.AsyncEx;
+
 namespace FubarDev.UnitOfWork
 {
     /// <summary>
@@ -23,6 +25,7 @@ namespace FubarDev.UnitOfWork
         : IUnitOfWorkFactory<TRepository>,
             IUnitOfWorkFactoryStatus<TRepository>
     {
+        private readonly object _statusManagerLock = new();
         private readonly IStatusManager<UnitOfWorkStatusItem<TRepository>> _statusManager;
         private readonly IRepositoryManager<TRepository> _repositoryManager;
         private readonly ILogger<UnitOfWorkFactory<TRepository>>? _logger;
@@ -52,8 +55,16 @@ namespace FubarDev.UnitOfWork
         }
 
         /// <inheritdoc />
-        public IEnumerable<IUnitOfWork<TRepository>> ActiveUnitsOfWork =>
-            _statusManager.ManagedStatusItems.Select(x => _unitOfWorkByStatusItems[x]);
+        public IEnumerable<IUnitOfWork<TRepository>> ActiveUnitsOfWork
+        {
+            get
+            {
+                lock (_statusManagerLock)
+                {
+                    return _statusManager.ManagedStatusItems.Select(x => _unitOfWorkByStatusItems[x]).ToList();
+                }
+            }
+        }
 
         /// <inheritdoc />
         public ValueTask<IUnitOfWork<TRepository>> CreateAsync(
@@ -67,39 +78,49 @@ namespace FubarDev.UnitOfWork
             bool saveChangesOnDispose,
             CancellationToken cancellationToken = default)
         {
-            var repository = _statusManager.TryGetCurrent(out var currentStatusItem)
-                ? currentStatusItem.Repository
-                : _repositoryManager.Create();
-
-            var isNewRepository = currentStatusItem == null;
-            var newStatusItem = new UnitOfWorkStatusItem<TRepository>(
-                repository,
-                isNewRepository,
-                saveChangesOnDispose,
-                currentStatusItem?.InheritedTransaction);
-            _statusManager.Add(newStatusItem);
-
-            var unitOfWork = new UnitOfWork<TRepository>(
-                repository,
-                _repositoryManager,
-                newStatusItem,
-                this);
-            _unitOfWorkByStatusItems[newStatusItem] = unitOfWork;
-
-            _logger?.LogInformation("Created unit of work {Id}", unitOfWork.Id);
-
-            if (!newStatusItem.IsNewRepository)
+            UnitOfWorkStatusItem<TRepository> newStatusItem;
+            lock (_statusManagerLock)
             {
-                return new ValueTask<IUnitOfWork<TRepository>>(unitOfWork);
+                var repository = _statusManager.TryGetCurrent(out var currentStatusItem)
+                    ? currentStatusItem.Repository
+                    : _repositoryManager.Create();
+
+                var initTask = currentStatusItem == null
+                    ? _repositoryManager.InitializeAsync(repository, cancellationToken).AsTask()
+                    : currentStatusItem.InitTask;
+
+                var isNewRepository = currentStatusItem == null;
+                newStatusItem = new UnitOfWorkStatusItem<TRepository>(
+                    repository,
+                    isNewRepository,
+                    saveChangesOnDispose,
+                    initTask,
+                    currentStatusItem?.InheritedTransaction);
+
+                _statusManager.Add(newStatusItem);
+
+                var unitOfWork = new UnitOfWork<TRepository>(
+                    repository,
+                    _repositoryManager,
+                    newStatusItem,
+                    this);
+                _unitOfWorkByStatusItems[newStatusItem] = unitOfWork;
+
+                newStatusItem.UnitOfWork = unitOfWork;
+
+                _logger?.LogInformation("Created unit of work {Id}", unitOfWork.Id);
             }
 
-            var resultTask = Task.Run<IUnitOfWork<TRepository>>(
-                async () =>
-                {
-                    await _repositoryManager.InitializeAsync(repository, cancellationToken);
-                    return unitOfWork;
-                },
-                cancellationToken);
+            var resultTask = Task.FromResult(newStatusItem)
+                .ContinueWith(
+                    async t =>
+                    {
+                        await t.Result.InitTask;
+                        return t.Result.UnitOfWork;
+                    },
+                    cancellationToken)
+                .Unwrap();
+
             return new ValueTask<IUnitOfWork<TRepository>>(resultTask);
         }
 
@@ -107,74 +128,51 @@ namespace FubarDev.UnitOfWork
         public ValueTask<ITransactionalUnitOfWork<TRepository>> CreateTransactionalAsync(
             CancellationToken cancellationToken)
         {
-            var repository = _statusManager.TryGetCurrent(out var currentStatusItem)
-                ? currentStatusItem.Repository
-                : _repositoryManager.Create();
-
-            var wantsNewTransaction =
-                _allowNestedTransactions
-                || currentStatusItem?.InheritedTransaction == null;
-
-            var isNewRepository = currentStatusItem == null;
-            var newStatusItem = new UnitOfWorkStatusItem<TRepository>(
-                repository,
-                isNewRepository,
-                !isNewRepository);
-            _statusManager.Add(newStatusItem);
-
-            // Register the unit of work
-            var unitOfWork = new TransactionalUnitOfWork<TRepository>(
-                repository,
-                _repositoryManager,
-                newStatusItem,
-                this);
-            _unitOfWorkByStatusItems[newStatusItem] = unitOfWork;
-
-            _logger?.LogInformation("Created unit of work {Id}", unitOfWork.Id);
-
-            var resultTask = Task.FromResult<ITransactionalUnitOfWork<TRepository>>(unitOfWork);
-            if (newStatusItem.IsNewRepository)
+            UnitOfWorkStatusItem<TRepository> newStatusItem;
+            lock (_statusManagerLock)
             {
-                resultTask = resultTask.ContinueWith(
-                        async t =>
-                        {
-                            await _repositoryManager.InitializeAsync(repository, cancellationToken);
-                            return t.Result;
-                        },
-                        cancellationToken)
-                    .Unwrap();
+                var repository = _statusManager.TryGetCurrent(out var currentStatusItem)
+                    ? currentStatusItem.Repository
+                    : _repositoryManager.Create();
+
+                var initTask = currentStatusItem == null
+                    ? _repositoryManager.InitializeAsync(repository, cancellationToken).AsTask()
+                    : currentStatusItem.InitTask;
+
+                var isNewRepository = currentStatusItem == null;
+                newStatusItem = new UnitOfWorkStatusItem<TRepository>(
+                    repository,
+                    isNewRepository,
+                    !isNewRepository,
+                    initTask);
+
+                _statusManager.Add(newStatusItem);
+
+                // Register the unit of work
+                var unitOfWork = new TransactionalUnitOfWork<TRepository>(
+                    repository,
+                    _repositoryManager,
+                    newStatusItem,
+                    this);
+                _unitOfWorkByStatusItems[newStatusItem] = unitOfWork;
+
+                newStatusItem.UnitOfWork = unitOfWork;
+                newStatusItem.TransactionTask = new AsyncLazy<IRepositoryTransaction>(
+                    async () => await InitTransaction(currentStatusItem, newStatusItem, cancellationToken));
+
+                _logger?.LogInformation("Created transactional unit of work {Id}", unitOfWork.Id);
             }
 
-            if (wantsNewTransaction)
-            {
-                // Workaround to ensure that the unit of work gets stored in the correct
-                // AsyncLocal value.
-                resultTask = resultTask.ContinueWith(
-                        async t =>
-                        {
-                            // Ensure that the transaction is started
-                            IRepositoryTransaction inheritedTransaction;
-                            IRepositoryTransaction? newTransaction;
-                            if (_allowNestedTransactions
-                                || currentStatusItem?.InheritedTransaction == null)
-                            {
-                                newTransaction = inheritedTransaction =
-                                    await _repositoryManager.StartTransactionAsync(repository, cancellationToken);
-                            }
-                            else
-                            {
-                                newTransaction = null;
-                                inheritedTransaction = currentStatusItem.InheritedTransaction;
-                            }
-
-                            newStatusItem.InheritedTransaction = inheritedTransaction;
-                            newStatusItem.NewTransaction = newTransaction;
-
-                            return t.Result;
-                        },
-                        cancellationToken)
-                    .Unwrap();
-            }
+            var resultTask = Task.FromResult(newStatusItem)
+                .ContinueWith(
+                    async t =>
+                    {
+                        await t.Result.InitTask;
+                        _ = await t.Result.TransactionTask!;
+                        return (ITransactionalUnitOfWork<TRepository>)t.Result.UnitOfWork;
+                    },
+                    cancellationToken)
+                .Unwrap();
 
             return new ValueTask<ITransactionalUnitOfWork<TRepository>>(resultTask);
         }
@@ -184,10 +182,21 @@ namespace FubarDev.UnitOfWork
             StatusItemResult status,
             CancellationToken cancellationToken = default)
         {
-            var finalizingInfo = _statusManager.Complete(statusItem, status);
+            IStatusFinalizingInfo<UnitOfWorkStatusItem<TRepository>> finalizingInfo;
+            lock (_statusManagerLock)
+            {
+                finalizingInfo = _statusManager.Complete(statusItem, status);
+            }
+
             foreach (var item in finalizingInfo.CompletedStatusItems)
             {
-                var unitOfWork = _unitOfWorkByStatusItems[item];
+                IUnitOfWork<TRepository> unitOfWork;
+                lock (_statusManagerLock)
+                {
+                    unitOfWork = _unitOfWorkByStatusItems[item];
+                    _unitOfWorkByStatusItems.Remove(item);
+                }
+
                 var finalStatus = finalizingInfo.GetEffectiveResult(item);
                 _logger?.Log(
                     finalStatus.GetLogLevel(),
@@ -221,6 +230,7 @@ namespace FubarDev.UnitOfWork
                                 $"Status {status} is nt supported for a transactional unit of work");
                     }
 
+                    // ReSharper disable once SuspiciousTypeConversion.Global
                     if (transaction is IAsyncDisposable asyncDisposable)
                     {
                         await asyncDisposable.DisposeAsync();
@@ -244,6 +254,33 @@ namespace FubarDev.UnitOfWork
                     }
                 }
             }
+        }
+
+        private async Task<IRepositoryTransaction> InitTransaction(
+            UnitOfWorkStatusItem<TRepository>? currentStatusItem,
+            UnitOfWorkStatusItem<TRepository> newStatusItem,
+            CancellationToken cancellationToken)
+        {
+            // Ensure that the transaction is started
+            IRepositoryTransaction inheritedTransaction;
+            IRepositoryTransaction? newTransaction;
+            if (_allowNestedTransactions
+                || currentStatusItem?.TransactionTask == null)
+            {
+                newTransaction = inheritedTransaction = await _repositoryManager.StartTransactionAsync(
+                    newStatusItem.Repository,
+                    cancellationToken);
+            }
+            else
+            {
+                inheritedTransaction = await currentStatusItem.TransactionTask;
+                newTransaction = null;
+            }
+
+            newStatusItem.InheritedTransaction = inheritedTransaction;
+            newStatusItem.NewTransaction = newTransaction;
+
+            return newTransaction ?? inheritedTransaction;
         }
     }
 }
