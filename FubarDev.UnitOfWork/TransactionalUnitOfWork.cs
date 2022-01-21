@@ -58,8 +58,16 @@ namespace FubarDev.UnitOfWork
             StatusItemResult status,
             CancellationToken cancellationToken = default)
         {
-            await _factory.FinishAsync(_statusItem, status, cancellationToken);
-            _status = status;
+            try
+            {
+                await _factory.FinishAsync(_statusItem, status, cancellationToken);
+                _status = status;
+            }
+            catch
+            {
+                _status = StatusItemResult.Rollback;
+                throw;
+            }
         }
     }
 }
