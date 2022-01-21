@@ -5,6 +5,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -230,29 +231,26 @@ namespace FubarDev.UnitOfWork
                                 $"Status {status} is nt supported for a transactional unit of work");
                     }
 
-                    // ReSharper disable once SuspiciousTypeConversion.Global
-                    if (transaction is IAsyncDisposable asyncDisposable)
-                    {
-                        await asyncDisposable.DisposeAsync();
-                    }
-                    else if (transaction is IDisposable disposable)
-                    {
-                        disposable.Dispose();
-                    }
+                    await TryDisposeAsync(transaction);
                 }
 
                 if (item.IsNewRepository)
                 {
-                    var repository = item.Repository;
-                    if (repository is IAsyncDisposable asyncDisposable)
-                    {
-                        await asyncDisposable.DisposeAsync();
-                    }
-                    else if (repository is IDisposable disposable)
-                    {
-                        disposable.Dispose();
-                    }
+                    await TryDisposeAsync(item.Repository);
                 }
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private async ValueTask TryDisposeAsync<T>(T item)
+        {
+            if (item is IAsyncDisposable asyncDisposable)
+            {
+                await asyncDisposable.DisposeAsync();
+            }
+            else if (item is IDisposable disposable)
+            {
+                disposable.Dispose();
             }
         }
 
