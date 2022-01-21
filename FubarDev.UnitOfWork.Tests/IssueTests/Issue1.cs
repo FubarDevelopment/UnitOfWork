@@ -47,7 +47,7 @@ namespace FubarDev.UnitOfWork.Tests.IssueTests
                     await using var unitOfWork = await _factory.CreateTransactionalAsync();
                     await unitOfWork.CommitAsync();
                 });
-            Assert.Equal("me bad", exception.Message);
+            Assert.Equal("me bad!", exception.Message);
         }
 
         private class DummyRepository
