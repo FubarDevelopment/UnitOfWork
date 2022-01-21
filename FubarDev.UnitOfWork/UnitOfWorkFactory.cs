@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -189,6 +190,7 @@ namespace FubarDev.UnitOfWork
                 finalizingInfo = _statusManager.Complete(statusItem, status);
             }
 
+            var capturedExceptions = new List<Exception>();
             foreach (var item in finalizingInfo.CompletedStatusItems)
             {
                 IUnitOfWork<TRepository> unitOfWork;
@@ -205,39 +207,65 @@ namespace FubarDev.UnitOfWork
                     unitOfWork.Id,
                     finalStatus);
 
-                if (statusItem.SaveChangesOnDispose
-                    && finalStatus is StatusItemResult.Undefined or StatusItemResult.Commit)
+                try
                 {
-                    // Flush all changes
-                    await _repositoryManager.SaveChangesAsync(item.Repository, cancellationToken);
-                }
-
-                var transaction = item.NewTransaction;
-                if (transaction != null)
-                {
-                    // Committing the transaction should implicitly save the changes,
-                    // while rolling back shouldn't.
-                    switch (finalStatus)
+                    try
                     {
-                        case StatusItemResult.Commit:
-                            await transaction.CommitAsync(cancellationToken);
-                            break;
-                        case StatusItemResult.Undefined:
-                        case StatusItemResult.Rollback:
-                            await transaction.RollbackAsync(cancellationToken);
-                            break;
-                        default:
-                            throw new NotSupportedException(
-                                $"Status {status} is nt supported for a transactional unit of work");
+                        if (statusItem.SaveChangesOnDispose
+                            && finalStatus is StatusItemResult.Undefined or StatusItemResult.Commit)
+                        {
+                            // Flush all changes
+                            await _repositoryManager.SaveChangesAsync(item.Repository, cancellationToken);
+                        }
+
+                        var transaction = item.NewTransaction;
+                        if (transaction != null)
+                        {
+                            // Committing the transaction should implicitly save the changes,
+                            // while rolling back shouldn't.
+                            try
+                            {
+                                switch (finalStatus)
+                                {
+                                    case StatusItemResult.Commit:
+                                        await transaction.CommitAsync(cancellationToken);
+                                        break;
+                                    case StatusItemResult.Undefined:
+                                    case StatusItemResult.Rollback:
+                                        await transaction.RollbackAsync(cancellationToken);
+                                        break;
+                                    default:
+                                        throw new NotSupportedException(
+                                            $"Status {status} is nt supported for a transactional unit of work");
+                                }
+                            }
+                            finally
+                            {
+                                await TryDisposeAsync(transaction);
+                            }
+                        }
                     }
-
-                    await TryDisposeAsync(transaction);
+                    finally
+                    {
+                        if (item.IsNewRepository)
+                        {
+                            await TryDisposeAsync(item.Repository);
+                        }
+                    }
                 }
-
-                if (item.IsNewRepository)
+                catch (Exception exception)
                 {
-                    await TryDisposeAsync(item.Repository);
+                    capturedExceptions.Add(exception);
                 }
+            }
+
+            if (capturedExceptions.Count == 1)
+            {
+                ExceptionDispatchInfo.Capture(capturedExceptions[0]).Throw();
+            }
+            else if (capturedExceptions.Count > 1)
+            {
+                throw new AggregateException(capturedExceptions);
             }
         }
 
